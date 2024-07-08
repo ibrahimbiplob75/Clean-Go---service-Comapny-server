@@ -10,7 +10,13 @@ const port = process.env.PORT || 3000;
 
 
 //middleware
-app.use(cors());
+app.use(cors({
+  origin:[
+    "http://localhost:5173"
+  ],
+  credentials:true,
+}));
+
 
 const verified=async(req,res,next)=>{
   const token=req.cookies?.token
@@ -51,18 +57,38 @@ async function run() {
     const services=client.db("Clean-Co-BD").collection("services")
     const bookings=client.db("Clean-Co-BD").collection("bookings")
 
-    app.get("/api/user/access-token",async(req,res)=>{
+    app.post("/api/user/access-token",async(req,res)=>{
         const user=req.body
-        const token=jwt.sign(user,process.env.SECRET_TOKEN,{expiresIn:60*60})
+        console.log(user)
+        const token=jwt.sign(user, process.env.SECRET_TOKEN , { expiresIn: '1h' })
         res.cookie("token",token,{
             httpOnly:true,
-            secure:false,
-            sameSite:"none"
+            secure:true,
+            sameSite:"none",
+            maxAge:3600000,
         }).send({"Success":true})
     })
 
+
+    // user/services/?sortField=details.pricing&sortOrder=asc&category=Home
+
     app.get("/api/user/services",verified,async(req,res)=>{
-        const result=await services.find().toArray()
+        const queryCategory=req.query?.category 
+        const sortField=req.query?.sortField
+        const sortOrder=req.query?.sortOrder
+
+        let catQuery={}
+        let sortObj={}
+
+        if(queryCategory){
+            catQuery.category=queryCategory
+        }
+        if(sortField && sortOrder){
+            sortObj[sortField]=sortOrder
+        }
+        
+
+        const result=await services.find(catQuery).sort(sortObj).toArray()
         res.send(result)
     })
 
@@ -70,6 +96,7 @@ async function run() {
 
     app.post("/api/user/create-booking",async(req,res)=>{
         const booking=req.body
+        
         const result=await bookings.insertOne(booking)
         res.send(result)
 
