@@ -51,11 +51,19 @@ const client = new MongoClient(uri, {
 
 
 
+
 async function run() {
   try {
-    await client.connect();
-    const services=client.db("Clean-Co-BD").collection("services")
-    const bookings=client.db("Clean-Co-BD").collection("bookings")
+
+    
+      await client.connect();
+      const  services = client.db('Clean-Co-BD').collection('services');
+      const  bookings=client.db("Clean-Co-BD").collection("bookings");
+      
+    
+
+    
+    
 
     app.post("/api/user/access-token",async(req,res)=>{
         const user=req.body
@@ -70,12 +78,42 @@ async function run() {
     })
 
 
+  
+
+  // API route to get unique categories
+    app.get('/api/categories', async (req, res) => {
+      try {
+        const categories = await services.aggregate([
+      { $group: { _id: "$category" } }, // Group by category
+      { $sort: { _id: 1 } }, // Optional: Sort categories
+      { $project: { _id: 0, category: "$_id" } } // Project only the category field
+    ]).toArray();
+
+    // Extract category names from result
+    const categoryNames = categories.map(cat => cat.category);
+    
+    res.json(categoryNames);
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch categories' });
+      }
+    });
+
+
+
     // user/services/?sortField=details.pricing&sortOrder=asc&category=Home
 
-    app.get("/api/user/services",verified,async(req,res)=>{
+    app.get("/api/user/services",async(req,res)=>{
         const queryCategory=req.query?.category 
         const sortField=req.query?.sortField
         const sortOrder=req.query?.sortOrder
+
+        //limit to show the data
+        const page=Number(req.query?.page);
+        const limit=Number(req.query?.limit);
+
+        const skip=(page-1)*limit 
+        
 
         let catQuery={}
         let sortObj={}
@@ -88,7 +126,15 @@ async function run() {
         }
         
 
-        const result=await services.find(catQuery).sort(sortObj).toArray()
+        const result=await services.find(catQuery).skip(skip).limit(limit).sort(sortObj).toArray()
+        const total=await services.countDocuments()
+        res.send({total,result})
+    })
+
+    app.get("/api/user/service/:id",async(req,res)=>{
+        const id=req.params.id 
+        const query={_id:new ObjectId(id)}
+        const result=await services.findOne(query)
         res.send(result)
     })
 
@@ -102,6 +148,8 @@ async function run() {
 
     })
 
+
+
     app.delete("/api/user/cancel-booking/:id",async(req,res)=>{
         const id=req.params.id 
         const query={_id:new ObjectId(id)}
@@ -112,9 +160,12 @@ async function run() {
     app.get("/api/user/bookings",verified,async(req,res)=>{
       const queryEmail=req.query?.email
       const tokenEmail=req.user?.email
-      if(queryEmail!==tokenEmail){
+      if(queryEmail){
+        if(queryEmail!==tokenEmail){
         return res.status(403).send({"message":"Forbidden acccess"})
       }
+      }
+      
 
       let query={}
       if(queryEmail){
