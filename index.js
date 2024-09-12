@@ -116,6 +116,13 @@ async function run() {
     res.send(result);
   })
 
+  app.delete("/api/user/cancel-users/:id",async(req,res)=>{
+        const id=req.params.id 
+        const query={_id:new ObjectId(id)}
+        const result=await users.deleteOne(query)
+        res.send(result)
+    })
+
 
 
   //Data inserted of new equipment
@@ -184,8 +191,18 @@ async function run() {
         res.send(result)
     })
 
-    
+    app.delete("/api/user/cancel-equipment/:id",async(req,res)=>{
+        const id=req.params.id 
+        const query={_id:new ObjectId(id)}
+        const result=await services.deleteOne(query)
+        res.send(result)
+    })
 
+
+
+
+    
+    // Booking Related API
     app.post("/api/user/create-booking",async(req,res)=>{
         const booking=req.body
         
