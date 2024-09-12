@@ -58,7 +58,9 @@ async function run() {
     
       await client.connect();
       const  services = client.db('Clean-Co-BD').collection('services');
+      const  users=client.db("Clean-Co-BD").collection("users");
       const  bookings=client.db("Clean-Co-BD").collection("bookings");
+
       
     
 
@@ -68,7 +70,7 @@ async function run() {
     app.post("/api/user/access-token",async(req,res)=>{
         const user=req.body
         console.log(user)
-        const token=jwt.sign(user, process.env.SECRET_TOKEN , { expiresIn: '1h' })
+        const token=jwt.sign(user, process.env.SECRET_TOKEN , { expiresIn: '72h' })
         res.cookie("token",token,{
             httpOnly:true,
             secure:true,
@@ -77,16 +79,60 @@ async function run() {
         }).send({"Success":true})
     })
 
+  // user cretation 
+  app.post("/api/user/create-user",async(req,res)=>{
+    const user=req.body
+    console.log(user)
+    const result=await users.insertOne(user)
+    res.send(result)
+  });
 
-  
+  //view user
+  app.get("/api/users",async(req,res)=>{
+    const result=await users.find().toArray();
+    res.send(result)
+  })
+
+  //view user
+  app.get("/api/users/:email",async(req,res)=>{
+    const email=req.params.email 
+    const query={email:email}
+    const result=await users.findOne(query)
+    res.send(result)
+  })
+  //roled user
+  app.patch("/api/user/status/:id",verified,async(req,res)=>{
+    const id=req.params.id;
+    const role=req.body.role;
+    const query={_id : new ObjectId(id)}
+    const options = { upsert: true };
+
+    const updateDoc = {
+      $set: {
+        role:role
+      },
+    };
+    const result = await users.updateOne(query, updateDoc, options);
+    res.send(result);
+  })
+
+
+
+  //Data inserted of new equipment
+  app.post("/api/admin/create-equipment",async(req,res)=>{
+      const service=req.body 
+      const result=await services.insertOne(service)
+      res.send(result)
+
+    })
 
   // API route to get unique categories
     app.get('/api/categories', async (req, res) => {
       try {
         const categories = await services.aggregate([
-      { $group: { _id: "$category" } }, // Group by category
-      { $sort: { _id: 1 } }, // Optional: Sort categories
-      { $project: { _id: 0, category: "$_id" } } // Project only the category field
+      { $group: { _id: "$category" } }, 
+      { $sort: { _id: 1 } }, 
+      { $project: { _id: 0, category: "$_id" } } 
     ]).toArray();
 
     // Extract category names from result
@@ -178,6 +224,26 @@ async function run() {
       
 
     })
+
+    app.get("/api/user/booked",async(req,res)=>{
+      const result=await bookings.find().toArray()
+      res.send(result)
+    })
+
+    app.patch("/api/user/bookings/status/:id",verified,async(req,res)=>{
+    const id=req.params.id;
+    const status=req.body.status;
+    const query={_id : new ObjectId(id)}
+    const options = { upsert: true };
+
+    const updateDoc = {
+      $set: {
+        status:status
+      },
+    };
+    const result = await bookings.updateOne(query, updateDoc, options);
+    res.send(result);
+  })
     
     
     await client.db("admin").command({ ping: 1 });
