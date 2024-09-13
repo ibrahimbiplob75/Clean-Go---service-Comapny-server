@@ -70,12 +70,11 @@ async function run() {
     app.post("/api/user/access-token",async(req,res)=>{
         const user=req.body
         console.log(user)
-        const token=jwt.sign(user, process.env.SECRET_TOKEN , { expiresIn: '72h' })
+        const token=jwt.sign(user, process.env.SECRET_TOKEN , { expiresIn: '96h' })
         res.cookie("token",token,{
             httpOnly:true,
             secure:true,
             sameSite:"none",
-            maxAge:3600000,
         }).send({"Success":true})
     })
 
