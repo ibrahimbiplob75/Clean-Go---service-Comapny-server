@@ -10,12 +10,17 @@ const port = process.env.PORT || 3000;
 
 
 //middleware
-app.use(cors({
-  origin:[
-    "http://localhost:5173"
-  ],
-  credentials:true,
-}));
+
+  app.use(cors({
+    origin:[
+      
+      "https://travel-agency-cf070.web.app",
+      "http://localhost:5173"
+      
+    ],
+    credentials:true,
+  }));
+
 
 
 const verified=async(req,res,next)=>{
@@ -56,7 +61,7 @@ async function run() {
   try {
 
     
-      await client.connect();
+      // await client.connect();
       const  services = client.db('Clean-Co-BD').collection('services');
       const  users=client.db("Clean-Co-BD").collection("users");
       const  bookings=client.db("Clean-Co-BD").collection("bookings");
@@ -79,11 +84,22 @@ async function run() {
     })
 
   // user cretation 
-  app.post("/api/user/create-user",async(req,res)=>{
-    const user=req.body
-    console.log(user)
-    const result=await users.insertOne(user)
-    res.send(result)
+  app.put("/api/user/create-user/:email",async(req,res)=>{
+      const email = req.params.email
+      const user = req.body
+      const query = { email: email }
+      const options = { upsert: true }
+      const isExist = await users.findOne(query)
+      if (isExist) return res.send(isExist)
+        
+      const result = await users.updateOne(
+        query,
+        {
+          $set: { ...user, timestamp: Date.now() },
+        },
+        options
+      )
+      res.send(result)
   });
 
   //view user
@@ -262,8 +278,8 @@ async function run() {
   })
     
     
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // await client.db("admin").command({ ping: 1 });
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     
     // await client.close();
