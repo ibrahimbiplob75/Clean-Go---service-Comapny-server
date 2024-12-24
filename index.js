@@ -4,6 +4,7 @@ const app=express();
 require('dotenv').config();
 var jwt = require('jsonwebtoken');
 var cookieParser = require('cookie-parser')
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const port = process.env.PORT || 3000;
@@ -65,6 +66,7 @@ async function run() {
       const  services = client.db('Clean-Co-BD').collection('services');
       const  users=client.db("Clean-Co-BD").collection("users");
       const  bookings=client.db("Clean-Co-BD").collection("bookings");
+      const  Carts=client.db("Clean-Co-BD").collection("carts");
 
       
     
@@ -81,6 +83,25 @@ async function run() {
             secure:true,
             sameSite:"none",
         }).send({"Success":true})
+    })
+
+    app.post("/api/create-payment-intent",async(req,res)=>{
+      const {price}=req.body;
+      console.log(price)
+      
+      const amount=parseInt(price * 100);
+      console.log(amount)
+      if(!price && amount<1){
+        return
+      }
+      const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount,
+      currency: "usd",
+      automatic_payment_methods: {
+        enabled: true,
+      }
+      });
+      res.send({clientSecret: paymentIntent.client_secret});
     })
 
   // user cretation 
@@ -175,6 +196,7 @@ async function run() {
         const queryCategory=req.query?.category 
         const sortField=req.query?.sortField
         const sortOrder=req.query?.sortOrder
+        console.log(queryCategory,sortField,sortOrder)
 
         //limit to show the data
         const page=Number(req.query?.page);
@@ -214,17 +236,87 @@ async function run() {
     })
 
 
-
-
-    
+ 
     // Booking Related API
     app.post("/api/user/create-booking",async(req,res)=>{
         const booking=req.body
-        
         const result=await bookings.insertOne(booking)
         res.send(result)
 
     })
+
+    //create add to cart
+     app.post("/api/user/create-cart",async(req,res)=>{
+        const cart=req.body
+        const result=await Carts.insertOne(cart)
+        res.send(result)
+
+    })
+    app.get('/api/cart-item', verified,async (req, res) => {
+      const queryEmail=req.query?.email
+      const tokenEmail=req.user?.email
+      console.log(queryEmail,tokenEmail)
+      if(queryEmail){
+        if(queryEmail!==tokenEmail){
+        return res.status(403).send({"message":"Forbidden acccess"})
+      }
+      }
+      let query={}
+      if(queryEmail){
+        query.email=queryEmail
+        
+      }
+
+      const result=await Carts.find(query).toArray()
+      console.log(result)
+      res.send(result)
+    });
+    app.delete('/api/cart/remove/:id', async (req, res) => {
+      const { id } = req.params;
+      try {
+        await Carts.findByIdAndDelete(id);
+        res.status(200).json({ message: 'Item removed from cart' });
+      } catch (error) {
+        res.status(500).json({ message: 'Failed to remove item', error });
+      }
+    });
+
+    app.post('/api/cart/pay/:id', async (req, res) => {
+      const { id } = req.params;
+      try {
+        const cartItem = await Carts.findById(id);
+        if (!cartItem) {
+          return res.status(404).json({ message: 'Cart item not found' });
+        }
+        await Carts.findByIdAndDelete(id); 
+        res.status(200).json({ message: 'Payment successful' });
+      } catch (error) {
+        res.status(500).json({ message: 'Payment failed', error });
+      }
+    });
+
+    app.patch("/api/cart/update-payment/:id", async (req, res) => {
+      const { id } = req.params;
+      const { paymentStatus } = req.body;
+
+      try {
+        const result = await Carts.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { paymentStatus: paymentStatus || "unpaid" } }
+        );
+
+        if (result.modifiedCount === 1) {
+          res.status(200).json({ success: true, message: "Payment status updated successfully." });
+        } else {
+          res.status(404).json({ success: false, message: "Cart item not found." });
+        }
+      } catch (error) {
+        console.error("Error updating payment status:", error);
+        res.status(500).json({ success: false, message: "Failed to update payment status." });
+      }
+    });
+
+
 
 
 
